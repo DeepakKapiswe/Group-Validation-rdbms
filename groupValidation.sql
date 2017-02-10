@@ -27,54 +27,69 @@ CREATE TABLE [rawMsg]
     CONSTRAINT [CHK_rawMsg] CHECK ([validationResult] in ('valid', 'invalid'))
 );
 
-CREATE TABLE [students]
+CREATE TABLE [groupMembers]
 (
-    [rollno] NVARCHAR(5)  NOT NULL,
-    [studentfname] NVARCHAR(100)  NOT NULL,
-    [studentmname] NVARCHAR(100),
-    [studentlname] NVARCHAR(100)  NOT NULL,
-    [studentTitle] NVARCHAR(5)  NOT NULL,
-    [studentDegree] NVARCHAR(5)  NOT NULL, /* mca/msc/mtech */
-    [studentEmail] NVARCHAR(200)  NOT NULL,
-    [studentMobile] NVARCHAR(20)  NOT NULL,
-    /* now add constraints */
-    CONSTRAINT [PKC_students] PRIMARY KEY  ([rollno])
-);
+    [groupId] INTEGER  NOT NULL,
+    [rollNo] INTEGER  NOT NULL,
+    [msgId] INTEGER  NOT NULL,
 
-CREATE TABLE [courses]
-(
-    [courseid] NVARCHAR(10)  NOT NULL,
-    [coursename] NVARCHAR(100)  NOT NULL,
-    [courseinfo] NVARCHAR(1000),
-    /* now add constraints */
-    CONSTRAINT [PKC_courses] PRIMARY KEY  ([courseid])
-    /* additional check constraints */
-    CONSTRAINT [CHK_courseid] CHECK ([courseid] in ('ip', 'mf', 'cmgt', 'dbms', 'co'))
-);
+    CONSTRAINT [PKC_groupMembers] PRIMARY KEY ([groupId],[rollNo])
 
-CREATE TABLE [teachercourses]
-(
-    [teacherid] NVARCHAR(5)  NOT NULL,
-    [courseid] NVARCHAR(10)  NOT NULL,
-    /* now add constraints */
-    CONSTRAINT [PKC_teachercourses] PRIMARY KEY  ([teacherid], [courseid]),
-    FOREIGN KEY ([teacherid]) REFERENCES [teachers] ([teacherid]) 
+    FOREIGN KEY ([groupId]) REFERENCES [maybeGroups] ([groupId]) 
 		ON DELETE RESTRICT ON UPDATE CASCADE,
-    FOREIGN KEY ([courseid]) REFERENCES [courses] ([courseid]) 
+
+    FOREIGN KEY ([msgId]) REFERENCES [rawMsg] ([msgId]) 
+		ON DELETE RESTRICT ON UPDATE CASCADE,
+    
+);
+
+CREATE TABLE [groups]
+(
+  [groupId] INTEGER NOT NULL,
+  [groupName] NVARCHAR(100) NOT NULL,
+  [groupInfo] TEXT NOT NULL,
+  [timestamp] TEXT NOT NULL,
+
+  CONSTRAINT [PKC_rawMsg] PRIMARY KEY ([groupId]),
+  
+  FOREIGN KEY ([groupId]) REFERENCES [mayBeGroups] ([groupId]) 
+		ON DELETE RESTRICT ON UPDATE CASCADE,
+
+CREATE TABLE [mayBeGroups]
+(
+    [groupId] INTEGER  NOT NULL AUTO INCREMENT,
+    [timestamp] TEXT  NOT NULL,
+    [senderRollNo] INTEGER NOT NULL,
+    [senderEmailId] TEXT NOT NULL,
+    [status] TEXT NOT NULL,
+    
+    CONSTRAINT [PKC_mayBeGroups] PRIMARY KEY  ([groupid],[senderRollNO])
+		ON DELETE RESTRICT ON UPDATE CASCADE,
+    
+    CONSTRAINT [CHK_status] CHECK ([status] in ('validGroup', 'notValidGrpoup'))
+		ON DELETE RESTRICT ON UPDATE CASCADE,
+);
+
+CREATE TABLE [mayBeGroupMembers]
+(
+    [groupId] INTEGER NOT NULL
+    [senderRollNO] INTEGER  NOT NULL,
+    [groupId] INTEGER  NOT NULL,
+    [memberRollNo] TEXT NOT NULL,
+    [status] TEXT NOT NULL,
+    
+    CONSTRAINT [PKC_mayBeGroupMembers] PRIMARY KEY ([groupId],[senderRollNO])
+
+    FOREIGN KEY ([status]) REFERENCES [mayBeGroups] ([status]) 
+		ON DELETE RESTRICT ON UPDATE CASCADE,
+    
+    FOREIGN KEY ([groupId]) REFERENCES [mayBeGroups] ([groupId]) 
+		ON DELETE RESTRICT ON UPDATE CASCADE
+    
+    FOREIGN KEY ([senderRollNO]) REFERENCES [mayBeGroups] ([senderRollNO]) 
 		ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-CREATE TABLE [studentcourses]
-(
-    [rollno] NVARCHAR(5)  NOT NULL,
-    [courseid] NVARCHAR(10)  NOT NULL,
-    /* now add constraints */
-    CONSTRAINT [PKC_studentcourses] PRIMARY KEY  ([rollno], [courseid]),
-    FOREIGN KEY ([rollno]) REFERENCES [students] ([rollno]) 
-		ON DELETE RESTRICT ON UPDATE CASCADE,
-    FOREIGN KEY ([courseid]) REFERENCES [courses] ([courseid]) 
-		ON DELETE RESTRICT ON UPDATE CASCADE
-);
 
 /*
 now create some triggers for fun
