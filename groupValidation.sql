@@ -23,7 +23,7 @@ CREATE TABLE [rawMsg]
     [timestamp] TEXT  NOT NULL,
     [validationResult]  NOT NULL,
 
-    CONSTRAINT [PKC_rawMsg] PRIMARY KEY  ([msgId])
+    CONSTRAINT [PKC_rawMsg] PRIMARY KEY  ([msgId],[timestamp])
     CONSTRAINT [CHK_rawMsg] CHECK ([validationResult] in ('valid', 'invalid'))
 );
 
