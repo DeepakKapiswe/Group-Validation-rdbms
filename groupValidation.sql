@@ -14,6 +14,7 @@ auxTable - rollList
 PRAGMA foreign_keys=1;
 
 DROP TABLE IF EXISTS [_rawMsg];
+DROP TABLE IF EXISTS [_msgId];
 DROP TABLE IF EXISTS [rawMsg];
 DROP TABLE IF EXISTS [groups];
 DROP TABLE IF EXISTS [groupMembers];
@@ -27,16 +28,25 @@ CREATE TABLE [_rawMsg]
     CONSTRAINT [PKC__rawMsg] PRIMARY KEY  ([msgTxt])
 );
 
+
+CREATE TABLE [_msgId]
+(
+    [msgId] INTEGER  PRIMARY KEY AUTOINCREMENT
+);
+
+
 CREATE TABLE [rawMsg]
 (
-    [msgId] INTEGER AUTO INCREMENT,
+    [msgId] INTEGER NOT NULL,
     [msgTxt] TEXT  NOT NULL,
-    [timestamp] TEXT  NOT NULL,
-    [validationResult] TEXT DEFAULT 'invalid' ,
+    [timestamp] TEXT NOT NULL,
+    [validationResult] TEXT DEFAULT 'invalid',
 
     CONSTRAINT [PKC_rawMsg] PRIMARY KEY  ([msgId],[timestamp]),
     CONSTRAINT [CHK_rawMsg] CHECK ([validationResult] in ('valid', 'invalid')),
     FOREIGN KEY ([msgTxt]) REFERENCES [_rawMsg] ([msgTxt])
+    ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY ([msgId]) REFERENCES [_msgId] ([msgId])
     ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -118,12 +128,23 @@ CREATE TABLE [log_courses]
 );
 
 */
-
+/*
+CREATE TRIGGER trigger_insert_msgid BEFORE INSERT ON rawMsg FOR EACH ROW
+BEGIN
+  DECLARE mID INTEGER;
+  SET mID = (SELECT AUTO_INCREMENT FROM groups.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='rawMsg';
+  SET NEW.msgId=mID;
+END;
+*/
+/*
 CREATE TRIGGER trigger_insert_raw_msg AFTER INSERT ON _rawMsg
 BEGIN
-  insert into [rawMsg] ([msgTxt],[timestamp]) values (NEW.msgTxt,datetime('now'));
+  DECLARE mID INTEGER;
+  insert into [_msgId] values (null);
+  --SET mID = (SELECT AUTO_INCREMENT FROM groups.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='_msgId';
+  insert into [rawMsg] ([msgId],[msgTxt],[timestamp]) values (mID,NEW.msgTxt,datetime('now'));
 END;
-
+*/
 /*
 CREATE TRIGGER trigger_log_courses BEFORE INSERT ON courses 
 BEGIN
