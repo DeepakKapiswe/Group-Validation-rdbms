@@ -7,12 +7,14 @@ finalGroups - groupId,memberRollNo
 */
 
 PRAGMA foreign_keys=1;
+PRAGMA recursive_triggers = ON;
 
 begin transaction;
+DROP TABLE IF EXISTS [_rawMsg];
 DROP TABLE IF EXISTS [rawMsg];
+DROP TABLE IF EXISTS [rawMembers];
 DROP TABLE IF EXISTS [currentMembersGId];
 DROP TABLE IF EXISTS [currentMembers];
-DROP TABLE IF EXISTS [currentGId];
 DROP TABLE IF EXISTS [nonAgreedGroups];
 DROP TABLE IF EXISTS [maybeGroupMembers];
 DROP TABLE IF EXISTS [maybeGroups];
@@ -21,22 +23,43 @@ DROP TABLE IF EXISTS [lengthExceededGroups];
 DROP TABLE IF EXISTS [finalGroups];
 DROP TABLE IF EXISTS [maybeAgreedGroups];
 DROP TABLE IF EXISTS [tempMembers];
-DROP TABLE IF EXISTS [aux_sematicChecker];
+DROP TABLE IF EXISTS [aux_semanticChecker];
 DROP TABLE IF EXISTS [groupLengthLimit];
 DROP TABLE IF EXISTS [generateGroupReport];
 DROP TABLE IF EXISTS [responses];
 DROP TABLE IF EXISTS [generateResponse];
+DROP TABLE IF EXISTS [senderEmails];
+
+CREATE TABLE [_rawMsg]
+(
+    [msg] TEXT NOT NULL,
+    [senderEmail] TEXT NOT NULL,
+    CONSTRAINT [PKC__rawmsg] PRIMARY KEY ([msg],[senderEmail])
+);
+
+CREATE TABLE [senderEmails]
+(
+    [senderEmailId] TEXT PRIMARY KEY
+);
+
+CREATE TABLE [rawMembers]
+(
+    [msg] TEXT PRIMARY KEY
+);
 
 CREATE TABLE [rawMsg]
 (
-    [msgId] INTEGER NOT NULL,
-    [msgTxt] TEXT  NOT NULL,
+    [msgId] INTEGER PRIMARY KEY AUTOINCREMENT,
+    [msgTxt] INTEGER  NOT NULL,
+    [senderEmailId] TEXT  NOT NULL,
     [timestamp] TEXT NOT NULL,
     [validationResult] TEXT DEFAULT 'invalid',
 
-    CONSTRAINT [PKC_rawMsg] PRIMARY KEY  ([msgId]),
     CONSTRAINT [CHK_rawMsg] CHECK ([validationResult] in ('valid', 'invalid'))
+    FOREIGN KEY ([senderEmailId]) REFERENCES [senderEmails] ([senderEmailId])
+    ON DELETE RESTRICT ON UPDATE CASCADE
 );
+
 
 CREATE TABLE [maybeGroups]
 (
@@ -46,6 +69,8 @@ CREATE TABLE [maybeGroups]
     [senderEmailId] TEXT NOT NULL,
 
     CONSTRAINT [PKC_maybeGroups] PRIMARY KEY  ([groupId],[senderRollNo])
+    FOREIGN KEY ([senderEmailId]) REFERENCES [senderEmails] ([senderEmailId])
+    ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 CREATE TABLE [maybeGroupMembers]
@@ -55,8 +80,10 @@ CREATE TABLE [maybeGroupMembers]
     [memberRollNo] INTEGER NOT NULL,
     [agreementStatus] TEXT NOT NULL default 'No',
 
-    CONSTRAINT [CHK_agreementStatus] CHECK ([agreementStatus] in ('Yes','No')),
     CONSTRAINT [PKC_mayBeGroupMembers] PRIMARY KEY ([groupId],[senderRollNo],[memberRollNo]),
+
+    CONSTRAINT [CHK_agreementStatus] CHECK ([agreementStatus] in ('Yes','No')),
+
     FOREIGN KEY ([groupId],[senderRollNo]) REFERENCES [maybeGroups] ([groupId],[senderRollNo])
     ON DELETE RESTRICT ON UPDATE CASCADE
 );
@@ -140,10 +167,10 @@ CREATE TABLE [tempMembers]
     CONSTRAINT [PKC_tempMembers] PRIMARY KEY ([memberRollNo])
 );
 
-CREATE TABLE [aux_sematicChecker]
+CREATE TABLE [aux_semanticChecker]
 (
     [val] INTEGER NOT NULL,
-    CONSTRAINT [PKC_aux_sematicChecker] PRIMARY KEY ([val])
+    CONSTRAINT [PKC_aux_semanticChecker] PRIMARY KEY ([val])
 );
 
 CREATE TABLE [generateGroupReport]
@@ -161,15 +188,52 @@ CREATE TABLE [groupLengthLimit]
 
 CREATE TABLE [responses]
 (
-    [msg] TEXT NOT NULL,
-    [senderEmailId] TEXT PRIMARY KEY
+    [senderEmailId] TEXT PRIMARY KEY,
+    [msg] TEXT NOT NULL
 );
 
 CREATE TABLE [generateResponse]
 (
-    [val] INTEGER NOT NULL,
-    CONSTRAINT [PKC_generateResponse] PRIMARY KEY ([val])
+    [val] INTEGER PRIMARY KEY
 );
+
+CREATE TRIGGER insertEmailId after insert on _rawMsg
+begin
+    insert into senderEmails values(new.senderEmail);
+end;
+
+CREATE TRIGGER splitMsgWithMembers after insert on _rawMsg
+when (select instr(new.msg,'\n')) > 0
+  begin
+    delete from rawMembers;
+    delete from tempMembers;
+    insert into rawMembers select substr(new.msg,(select instr(new.msg,'\n')+2));
+    insert into rawMsg(msgTxt,senderEmailId,timestamp,validationResult) values ((select substr(new.msg,1,(select instr(new.msg,'\n')-1))),new.senderEmail,datetime('now'),'valid');
+  end;
+
+CREATE TRIGGER splitMsgWithoutMembers after insert on _rawMsg
+when (select instr(new.msg,'\n'))=0
+  begin
+    delete from rawMembers;
+    delete from tempMembers;
+    insert into rawMsg (msgTxt,senderEmailId,timestamp,validationResult) values (cast(new.msg as INTEGER),new.senderEmail,datetime(),'valid');
+  end;
+
+CREATE TRIGGER splitMembers after insert on rawMembers
+when (select length(new.msg)) > 0
+  begin
+    insert into tempMembers select cast((select substr(new.msg,1,(select instr(new.msg,'\n')-1))) as INTEGER);
+    insert into rawMembers select substr(new.msg,(select instr(new.msg,'\n')+2));
+  end;
+
+
+CREATE TRIGGER insertInmaybeGroups after insert on rawMsg
+when new.validationResult='valid'
+  begin
+    /*delete from rawMembers;*/
+    insert into maybeGroups values(new.msgId,new.timestamp,(select cast(new.msgTxt as INTEGER)),new.senderEmailId);
+  end;
+
 
 CREATE TRIGGER insertMembers after insert on maybeGroups
 begin
@@ -177,11 +241,11 @@ begin
 
     delete from currentMembers;
     delete from currentMembersGId;
-    delete from aux_sematicChecker;
+    delete from aux_semanticChecker;
     insert into currentMembers select groupId,senderRollNo,memberRollNo from maybeGroupMembers where groupId = new.groupId;
     insert into currentMembersGId select groupId,senderRollNo from maybeGroups where groupId=new.groupId;
 
-    insert into aux_sematicChecker values (1);
+    insert into aux_semanticChecker values (1);
 end;
 
 CREATE TRIGGER insertCurrentMemberGId after insert on currentMembers
@@ -197,10 +261,11 @@ begin
     update maybeGroupMembers set agreementStatus='Yes' where  senderRollNo=new.memberRollNo and memberRollNo=new.senderRollNo;
 end;
 
-create trigger checkIsValidGroup after insert on aux_sematicChecker
+create trigger checkIfAgreedGroup after insert on aux_semanticChecker
 when (select count(agreementStatus) from maybeGroupMembers where groupId in (select groupId from currentMembersGId) and agreementStatus='No') = 0
 begin
     insert into maybeAgreedGroups  select * from ((select group_concat(groupId,'') from currentMembersGId) inner join currentMembersGId);
+    delete from tempMembers;
 end;
 
 CREATE TRIGGER generateReport after insert on generateGroupReport
@@ -229,46 +294,41 @@ end;
 
 
 
+insert into _rawMsg values('13\n49\n19\n','yhty@gmail.com');
+insert into _rawMsg values('19\n49\n13\n','sknn@gmail.com');
+insert into _rawMsg values('49\n13\n19\n','etgt@gmail.com');
 
-insert into groupLengthLimit(length) values(2);
+insert into _rawMsg values('50\n','setgt@gmail.com');
 
-insert into tempMembers values (13);
-insert into tempMembers values (49);
-insert into maybeGroups values (1,datetime('now'),19,'sknn@gmail.com');
-
-insert into tempMembers values (19);
-insert into tempMembers values (49);
-insert into maybeGroups values (2,datetime('now'),13,'yhty@gmail.com');
-
-insert into tempMembers values (19);
-insert into tempMembers values (13);
-insert into maybeGroups values (3,datetime('now'),49,'etgt@gmail.com');
+insert into _rawMsg values('41\n50\n','ewwwtgt@gmail.com');
 
 
-insert into tempMembers values (15);
-insert into tempMembers values (16);
-insert into maybeGroups values(4,datetime('now'),114,'rgrgr@gmail.com');
+insert into _rawMsg values('1\n2\n3\n4\n','daetgt@gmail.com');
+insert into _rawMsg values('2\n1\n3\n4\n','edatgt@gmail.com');
+insert into _rawMsg values('3\n2\n1\n4\n','wdtgt@gmail.com');
+insert into _rawMsg values('4\n2\n3\n1\n','detgt@gmail.com');
 
-insert into tempMembers values (1232);
-insert into tempMembers values (1623);
-insert into maybeGroups values(12,datetime('now'),234,'sdaswrgr@gmail.com');
 
-insert into maybeGroups values(5,datetime('now'),115,'23we3@gmail.com');
+insert into _rawMsg values('5\n6\n7\n','qetgt@gmail.com');
+insert into _rawMsg values('7\n6\n5\n','wetgt@gmail.com');
+insert into _rawMsg values('6\n5\n7\n','eetgt@gmail.com');
+
+insert into _rawMsg values('15\n16\n7\n','retgt@gmail.com');
+insert into _rawMsg values('7\n16\n15\n','tetgt@gmail.com');
+insert into _rawMsg values('16\n15\n7\n','yetgt@gmail.com');
+
+
+insert into groupLengthLimit(length) values(3);
+
 
 insert into generateGroupReport values(1);
 insert into generateresponse values (1);
+
 end;
+
 select * from nonAgreedGroups;
-select * from conflictingGroupMember;
+select * from conflictinggroupmember where memberrollno in (select memberRollNo from conflictinggroupmember group by memberRollNo having count()>1);
 select * from lengthExceededGroups;
 select * from finalGroups;
 select * from responses;
---select senderRollNO,group_concat(memberRollNo) from maybeGroupMembers where groupId in (select groupId from nonAgreedGroups) and agreementStatus='No' group by groupId;
 
---insert into maybeGroupMembers(groupId,senderRollNo,memberRollNo) values(1,111,112);
---insert into maybeGroupMembers(groupId,senderRollNo,memberRollNo) values(1,111,113);
---insert into maybeGroupMembers(groupId,senderRollNo,memberRollNo) values(2,112,111);
---insert into maybeGroupMembers(groupId,senderRollNo,memberRollNo) values(2,112,113);
---insert into maybeGroupMembers(groupId,senderRollNo,memberRollNo) values(3,113,111);
---insert into maybeGroupMembers(groupId,senderRollNo,memberRollNo) values(3,113,112);
---insert into maybeGroupMembers(groupId,senderRollNo,memberRollNo) values(4,114,115);
