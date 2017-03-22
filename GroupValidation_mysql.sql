@@ -51,160 +51,162 @@ CREATE TABLE input_groupLengthLimit
     CONSTRAINT PKC_input_groupLengthLimit PRIMARY KEY (id)
 );
 
+CREATE TABLE input_userApplications
+(
+    msgId INTEGER AUTO_INCREMENT,
+    msg TEXT NOT NULL,
+    senderEmail TEXT NOT NULL,
+    CONSTRAINT PKC_input_userApplications PRIMARY KEY (msgId)
+);
+
+CREATE TABLE input_generateGroupReports
+(
+    val VARCHAR(5) PRIMARY KEY
+);
+
+CREATE TABLE aux_senderEmails
+(
+    senderEmailId VARCHAR(255) PRIMARY KEY
+);
+
+CREATE TABLE aux_maybeRollNos
+(
+    id INTEGER AUTO_INCREMENT PRIMARY KEY,
+    remainingMemberRollString TEXT
+);
+
+CREATE TABLE aux_userApplicationInfo
+(
+    msgId INTEGER PRIMARY KEY AUTO_INCREMENT,
+    senderRollNo TEXT  NOT NULL,
+    senderEmailId VARCHAR (255)  NOT NULL,
+    timestamp TEXT NOT NULL,
+    validationResult VARCHAR (8) DEFAULT 'invalid',
+
+    CONSTRAINT CHKaux_userApplicationInfo CHECK (validationResult in ('valid', 'invalid')),
+    FOREIGN KEY (senderEmailId) REFERENCES aux_senderEmails (senderEmailId)
+    ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+
+CREATE TABLE aux_maybeGroups
+(
+    groupId INTEGER NOT NULL,
+    timestamp TEXT NOT NULL,
+    senderRollNo VARCHAR (10) NOT NULL,
+    senderEmailId VARCHAR (255) NOT NULL,
+
+    CONSTRAINT PKC_aux_maybeGroups PRIMARY KEY (groupId,senderRollNo),
+    FOREIGN KEY (senderEmailId) REFERENCES aux_senderEmails (senderEmailId)
+    ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE aux_maybeGroupMembers
+(
+    groupId INTEGER NOT NULL,
+    senderRollNo VARCHAR (10)  NOT NULL,
+    memberRollNo VARCHAR (10) NOT NULL,
+    agreementStatus VARCHAR (4) NOT NULL default 'No',
+
+    CONSTRAINT PKC_aux_maybeGroupMembers PRIMARY KEY (groupId,senderRollNo,memberRollNo),
+    CONSTRAINT CHK_agreementStatus CHECK (agreementStatus in ('Yes','No')),
+    FOREIGN KEY (groupId,senderRollNo) REFERENCES aux_maybeGroups (groupId,senderRollNo)
+    ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
 /*
-CREATE TABLE input_userApplications]
+CREATE TABLE aux_currentGroupMembersRollNos
 (
-    [msg] TEXT NOT NULL,
-    [senderEmail] TEXT NOT NULL,
-    CONSTRAINT [PKC_input_userApplications] PRIMARY KEY ([msg],[senderEmail])
-);
+    groupId TEXT NOT NULL,
+    senderRollNo TEXT  NOT NULL,
+    memberRollNo TEXT NOT NULL,
 
-CREATE TABLE [input_generateGroupReports]
-(
-    [val] TEXT PRIMARY KEY
-);
-
-CREATE TABLE [aux_senderEmails]
-(
-    [senderEmailId] TEXT PRIMARY KEY
-);
-
-CREATE TABLE [aux_maybeRollNos]
-(
-    [remainingMemberRollString] TEXT PRIMARY KEY
-);
-
-CREATE TABLE [aux_userApplicationInfo]
-(
-    [msgId] INTEGER PRIMARY KEY AUTOINCREMENT,
-    [senderRollNo] TEXT  NOT NULL,
-    [senderEmailId] TEXT  NOT NULL,
-    [timestamp] TEXT NOT NULL,
-    [validationResult] TEXT DEFAULT 'invalid',
-
-    CONSTRAINT [CHKinput_userApplications] CHECK ([validationResult] in ('valid', 'invalid'))
-    FOREIGN KEY ([senderEmailId]) REFERENCES [aux_senderEmails] ([senderEmailId])
+    CONSTRAINT PKC_currentGroupMembers PRIMARY KEY (groupId,senderRollNo,memberRollNo),
+    FOREIGN KEY (groupId,senderRollNo,memberRollNo) REFERENCES aux_maybeGroupMembers (groupId,senderRollNo,memberRollNo)
     ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-
-CREATE TABLE [aux_maybeGroups]
+CREATE TABLE aux_currentGroupMembersGIds
 (
-    [groupId] TEXT NOT NULL,
-    [timestamp] TEXT  NOT NULL,
-    [senderRollNo] TEXT NOT NULL,
-    [senderEmailId] TEXT NOT NULL,
+    groupId TEXT NOT NULL,
+    senderRollNo TEXT  NOT NULL,
 
-    CONSTRAINT [PKC_aux_maybeGroups] PRIMARY KEY  ([groupId],[senderRollNo])
-    FOREIGN KEY ([senderEmailId]) REFERENCES [aux_senderEmails] ([senderEmailId])
+    CONSTRAINT PKC_groupId PRIMARY KEY (groupId,senderRollNo),
+    FOREIGN KEY (groupId,senderRollNo) REFERENCES aux_maybeGroups (groupId,senderRollNo)
     ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-CREATE TABLE [aux_maybeGroupMembers]
+CREATE TABLE aux_agreedGroups
 (
-    [groupId] TEXT NOT NULL,
-    [senderRollNo] TEXT  NOT NULL,
-    [memberRollNo] TEXT NOT NULL,
-    [agreementStatus] TEXT NOT NULL default 'No',
+    finalGId TEXT NOT NULL,
+    groupId TEXT NOT NULL,
+    memberRollNo TEXT NOT NULL,
+    CONSTRAINT PKC_aux_agreedGroups PRIMARY KEY (finalGId,groupId,memberRollNo)
+);
 
-    CONSTRAINT [PKC_aux_maybeGroupMembers] PRIMARY KEY ([groupId],[senderRollNo],[memberRollNo]),
-    CONSTRAINT [CHK_agreementStatus] CHECK ([agreementStatus] in ('Yes','No')),
-    FOREIGN KEY ([groupId],[senderRollNo]) REFERENCES [aux_maybeGroups] ([groupId],[senderRollNo])
+CREATE TABLE aux_maybeMemberRollNos
+(
+    memberRollNo TEXT PRIMARY KEY
+);
+
+CREATE TABLE aux_flag2trigger_checkIfGroupMembersAgree
+(
+    val TEXT PRIMARY KEY
+);
+
+CREATE TABLE aux_flag2trigger_updateReminderMsgs
+(
+    val TEXT PRIMARY KEY
+);
+
+CREATE TABLE output_finalValidGroups
+(
+    finalGId TEXT NOT NULL,
+    groupId TEXT NOT NULL,
+    memberRollNo TEXT NOT NULL,
+
+    CONSTRAINT PKC_output_finalValidGroups PRIMARY KEY (finalGId,groupId,memberRollNo),
+    FOREIGN KEY (finalGId,groupId,memberRollNo) REFERENCES aux_agreedGroups (finalGId,groupId,memberRollNo)
     ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-CREATE TABLE [aux_currentGroupMembersRollNos]
+CREATE TABLE output_nonAgreedGroups
 (
-    [groupId] TEXT NOT NULL,
-    [senderRollNo] TEXT  NOT NULL,
-    [memberRollNo] TEXT NOT NULL,
-
-    CONSTRAINT [PKC_currentGroupMembers] PRIMARY KEY ([groupId],[senderRollNo],[memberRollNo]),
-    FOREIGN KEY ([groupId],[senderRollNo],[memberRollNo]) REFERENCES [aux_maybeGroupMembers] ([groupId],[senderRollNo],[memberRollNo])
+    groupId TEXT NOT NULL,
+    senderRollNo TEXT NOT NULL,
+    CONSTRAINT PKC_output_nonAgreedGroups PRIMARY KEY (groupId,senderRollNo),
+    FOREIGN KEY (groupId,senderRollNo) REFERENCES aux_maybeGroups (groupId,senderRollNo)
     ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-CREATE TABLE [aux_currentGroupMembersGIds]
+CREATE TABLE output_conflictingGroups
 (
-    [groupId] TEXT NOT NULL,
-    [senderRollNo] TEXT  NOT NULL,
-
-    CONSTRAINT [PKC_groupId] PRIMARY KEY ([groupId],[senderRollNo]),
-    FOREIGN KEY ([groupId],[senderRollNo]) REFERENCES [aux_maybeGroups] ([groupId],[senderRollNo])
+    finalGId TEXT NOT NULL,
+    groupId TEXT NOT NULL,
+    memberRollNo TEXT NOT NULL,
+    CONSTRAINT PKC_output_conflictingGroups PRIMARY KEY (finalGId,groupId,memberRollNo)
+    FOREIGN KEY (finalGId,groupId,memberRollNo) REFERENCES aux_agreedGroups (finalGId,groupId,memberRollNo)
     ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-CREATE TABLE [aux_agreedGroups]
+CREATE TABLE output_lengthExceededGroups
 (
-    [finalGId] TEXT NOT NULL,
-    [groupId] TEXT NOT NULL,
-    [memberRollNo] TEXT NOT NULL,
-    CONSTRAINT [PKC_aux_agreedGroups] PRIMARY KEY ([finalGId],[groupId],[memberRollNo])
-);
-
-CREATE TABLE [aux_maybeMemberRollNos]
-(
-    [memberRollNo] TEXT PRIMARY KEY
-);
-
-CREATE TABLE [aux_flag2trigger_checkIfGroupMembersAgree]
-(
-    [val] TEXT PRIMARY KEY
-);
-
-CREATE TABLE [aux_flag2trigger_updateReminderMsgs]
-(
-    [val] TEXT PRIMARY KEY
-);
-
-CREATE TABLE [output_finalValidGroups]
-(
-    [finalGId] TEXT NOT NULL,
-    [groupId] TEXT NOT NULL,
-    [memberRollNo] TEXT NOT NULL,
-
-    CONSTRAINT [PKC_output_finalValidGroups] PRIMARY KEY ([finalGId],[groupId],[memberRollNo]),
-    FOREIGN KEY ([finalGId],[groupId],[memberRollNo]) REFERENCES [aux_agreedGroups] ([finalGId],[groupId],[memberRollNo])
+    finalGId TEXT NOT NULL,
+    groupId TEXT NOT NULL,
+    memberRollNo TEXT NOT NULL,
+    CONSTRAINT PKC_lengthExceededGroup PRIMARY KEY (finalGId,groupId,memberRollNo)
+    FOREIGN KEY (finalGId,groupId,memberRollNo) REFERENCES aux_agreedGroups (finalGId,groupId,memberRollNo)
     ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-CREATE TABLE [output_nonAgreedGroups]
+CREATE TABLE output_reminderMsgs
 (
-    [groupId] TEXT NOT NULL,
-    [senderRollNo] TEXT NOT NULL,
-    CONSTRAINT [PKC_output_nonAgreedGroups] PRIMARY KEY ([groupId],[senderRollNo]),
-    FOREIGN KEY ([groupId],[senderRollNo]) REFERENCES [aux_maybeGroups] ([groupId],[senderRollNo])
-    ON DELETE RESTRICT ON UPDATE CASCADE
-);
-
-CREATE TABLE [output_conflictingGroups]
-(
-    [finalGId] TEXT NOT NULL,
-    [groupId] TEXT NOT NULL,
-    [memberRollNo] TEXT NOT NULL,
-    CONSTRAINT [PKC_output_conflictingGroups] PRIMARY KEY ([finalGId],[groupId],[memberRollNo])
-    FOREIGN KEY ([finalGId],[groupId],[memberRollNo]) REFERENCES [aux_agreedGroups] ([finalGId],[groupId],[memberRollNo])
-    ON DELETE RESTRICT ON UPDATE CASCADE
-);
-
-CREATE TABLE [output_lengthExceededGroups]
-(
-    [finalGId] TEXT NOT NULL,
-    [groupId] TEXT NOT NULL,
-    [memberRollNo] TEXT NOT NULL,
-    CONSTRAINT [PKC_lengthExceededGroup] PRIMARY KEY ([finalGId],[groupId],[memberRollNo])
-    FOREIGN KEY ([finalGId],[groupId],[memberRollNo]) REFERENCES [aux_agreedGroups] ([finalGId],[groupId],[memberRollNo])
-    ON DELETE RESTRICT ON UPDATE CASCADE
-);
-
-CREATE TABLE [output_reminderMsgs]
-(
-    [groupId] TEXT NOT NULL,
-    [senderRollNo] TEXT NOT NULL,
-    [senderEmailId] TEXT NOT NULL,
-    [msg] TEXT NOT NULL,
-    CONSTRAINT [PKC_reminderMsgs] PRIMARY KEY ([groupId],[senderRollno]),
-    FOREIGN KEY ([groupId],[senderRollno]) REFERENCES [aux_maybeGroups] ([groupId],[senderRollno])
+    groupId TEXT NOT NULL,
+    senderRollNo TEXT NOT NULL,
+    senderEmailId TEXT NOT NULL,
+    msg TEXT NOT NULL,
+    CONSTRAINT PKC_reminderMsgs PRIMARY KEY (groupId,senderRollno),
+    FOREIGN KEY (groupId,senderRollno) REFERENCES aux_maybeGroups (groupId,senderRollno)
     ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -217,15 +219,15 @@ CREATE TRIGGER trigger_getApplicationInfo after insert on input_userApplications
     delete from aux_currentGroupMembersGIds;
     delete from aux_flag2trigger_checkIfGroupMembersAgree;
     insert into aux_senderEmails values(new.senderEmail);
-    insert into aux_maybeRollNos select substr(new.msg,(select instr(new.msg,' ')+1));
-    insert into aux_userApplicationInfo(senderRollNo,senderEmailId,timestamp,validationResult) values ((select substr(new.msg,1,(select instr(new.msg,' ')-1))),new.senderEmail,datetime('now'),'valid');
+    insert into aux_maybeRollNos (remainingMemberRollString) select substr(new.msg,(select instr(new.msg,' ')+1));
+    insert into aux_userApplicationInfo (senderRollNo,senderEmailId,timestamp,validationResult) values ((select substr(new.msg,1,(select instr(new.msg,' ')-1))),new.senderEmail,datetime('now'),'valid');
   end;
 
 CREATE TRIGGER trigger_getMaybeRollNos after insert on aux_maybeRollNos
 when (select length(new.remainingMemberRollString)) > 0
   begin
-    insert into aux_maybeMemberRollNos select substr(new.remainingMemberRollString,1,(select instr(new.remainingMemberRollString,' ')-1));
-    insert into aux_maybeRollNos select substr(new.remainingMemberRollString,(select instr(new.remainingMemberRollString,' ')+1));
+    insert into aux_maybeMemberRollNos  select substr(new.remainingMemberRollString,1,(select instr(new.remainingMemberRollString,' ')-1));
+    insert into aux_maybeRollNos (remainingMemberRollString) select substr(new.remainingMemberRollString,(select instr(new.remainingMemberRollString,' ')+1));
   end;
 
 CREATE TRIGGER trigger_insertMaybeGroupDetails after insert on aux_userApplicationInfo
@@ -289,35 +291,35 @@ begin
 end;
 
 
-insert into input_userApplications values('13 49 19 ','yhty@gmail.com');
-insert into input_userApplications values('19 49 13 ','sknn@gmail.com');
-insert into input_userApplications values('49 13 19 ','etgt@gmail.com');
+insert into input_userApplications(msg,senderEmail) values('13 49 19 ','yhty@gmail.com');
+insert into input_userApplications(msg,senderEmail) values('19 49 13 ','sknn@gmail.com');
+insert into input_userApplications (msg,senderEmail) values('49 13 19 ','etgt@gmail.com');
 
-insert into input_userApplications values('50 ','setgt@gmail.com');
-insert into input_userApplications values('52 64 ','ssaetgt@gmail.com');
+insert into input_userApplications (msg,senderEmail) values('50 ','setgt@gmail.com');
+insert into input_userApplications (msg,senderEmail) values('52 64 ','ssaetgt@gmail.com');
 
-insert into input_userApplications values('41 50 90 ','ewwwtgt@gmail.com');
-
-
-insert into input_userApplications values('1 2 3 4 ','daetgt@gmail.com');
-insert into input_userApplications values('2 1 3 4 ','edatgt@gmail.com');
-insert into input_userApplications values('3 2 1 4 ','wdtgt@gmail.com');
-insert into input_userApplications values('4 2 3 1 ','detgt@gmail.com');
+insert into input_userApplications(msg,senderEmail)  values('41 50 90 ','ewwwtgt@gmail.com');
 
 
-insert into input_userApplications values('5 6 7 ','qetgt@gmail.com');
-insert into input_userApplications values('7 6 5 ','wetgt@gmail.com');
-insert into input_userApplications values('6 5 7 ','eetgt@gmail.com');
+insert into input_userApplications (msg,senderEmail) values('1 2 3 4 ','daetgt@gmail.com');
+insert into input_userApplications(msg,senderEmail)  values('2 1 3 4 ','edatgt@gmail.com');
+insert into input_userApplications(msg,senderEmail)  values('3 2 1 4 ','wdtgt@gmail.com');
+insert into input_userApplications(msg,senderEmail)  values('4 2 3 1 ','detgt@gmail.com');
 
-insert into input_userApplications values('15 16 7 ','retgt@gmail.com');
-insert into input_userApplications values('7 16 15 ','tetgt@gmail.com');
-insert into input_userApplications values('16 15 7 ','yetgt@gmail.com');
+
+insert into input_userApplications (msg,senderEmail) values('5 6 7 ','qetgt@gmail.com');
+insert into input_userApplications(msg,senderEmail)  values('7 6 5 ','wetgt@gmail.com');
+insert into input_userApplications (msg,senderEmail) values('6 5 7 ','eetgt@gmail.com');
+
+insert into input_userApplications (msg,senderEmail) values('15 16 7 ','retgt@gmail.com');
+insert into input_userApplications (msg,senderEmail) values('7 16 15 ','tetgt@gmail.com');
+insert into input_userApplications (msg,senderEmail) values('16 15 7 ','yetgt@gmail.com');
 
 
 insert into input_groupLengthLimit(length) values(3);
 
 
-insert into input_generateGroupReports values(1);
+insert into input_generateGroupReports values('1');
 
 end;
 select 'output_nonAgreedGroups';
