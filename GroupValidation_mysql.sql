@@ -11,6 +11,10 @@ reminders be generated on trigger
 begin transaction;
 */
 
+DROP DATABASE IF EXISTS groupdb;
+CREATE DATABASE groupdb;
+USE groupdb;
+
 DROP TABLE IF EXISTS output_finalValidGroups;
 DROP TABLE IF EXISTS output_conflictingGroups;
 DROP TABLE IF EXISTS output_nonAgreedGroups;
@@ -349,7 +353,7 @@ CREATE PROCEDURE procedure_getMaybeRollNos (inputString TEXT)
   end;
  |
 delimiter ;
-
+/*
 insert into input_userFormSubmissionDeadline(deadline) values ('2017-04-29 03:42:14');
 
 insert into input_userApplications(msg,senderEmail,timestamp) values('13 49 19 ','yhty@gmail.com','2017-05-29 03:42:14');
@@ -391,4 +395,4 @@ select 'output_finalValidGroups';
 select * from output_finalValidGroups;
 select 'output_reminderMsgs';
 select * from output_reminderMsgs;
-
+*/
