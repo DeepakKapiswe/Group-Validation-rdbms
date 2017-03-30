@@ -36,6 +36,7 @@ DROP TABLE IF EXISTS input_groupLengthLimit;
 DROP TABLE IF EXISTS input_userFormSubmissionDeadline;
 DROP TABLE IF EXISTS input_generateGroupReports;
 
+DROP TRIGGER IF EXISTS trigger_insertCurrentTime;
 DROP TRIGGER IF EXISTS trigger_getMaybeRollNos;
 DROP TRIGGER IF EXISTS trigger_getApplicationInfo;
 DROP TRIGGER IF EXISTS trigger_insertMaybeGroupDetails;
@@ -232,6 +233,12 @@ CREATE TABLE output_reminderMsgs
 
 delimiter |
 
+CREATE TRIGGER trigger_insertCurrentTime before insert on input_userApplications
+FOR EACH ROW
+  begin
+    set new.timestamp =current_timestamp();
+  end;
+
 CREATE TRIGGER trigger_getApplicationInfo after insert on input_userApplications
 FOR EACH ROW
   begin
@@ -345,7 +352,7 @@ delimiter ;
 
 insert into input_userFormSubmissionDeadline(deadline) values ('2017-04-29 03:42:14');
 
-insert into input_userApplications(msg,senderEmail,timestamp) values('13 49 19 ','yhty@gmail.com',current_timestamp());
+insert into input_userApplications(msg,senderEmail,timestamp) values('13 49 19 ','yhty@gmail.com','2017-05-29 03:42:14');
 insert into input_userApplications(msg,senderEmail,timestamp) values('19 49 13 ','sknn@gmail.com',current_timestamp());
 insert into input_userApplications (msg,senderEmail,timestamp) values('49 13 19 ','etgt@gmail.com',current_timestamp());
 insert into input_userApplications (msg,senderEmail,timestamp) values('50 ','setgt@gmail.com',current_timestamp());
@@ -374,8 +381,14 @@ insert into input_groupLengthLimit(length) values(3);
 
 
 insert into input_generateGroupReports values('1');
+select 'output_nonAgreedGroups';
 select * from output_nonAgreedGroups;
+select 'output_conflictingGroups';
 select * from output_conflictingGroups where memberrollno in (select memberRollNo from output_conflictingGroups group by memberRollNo having count(*)>1);
+select 'output_lengthExceededGroups';
 select * from output_lengthExceededGroups;
+select 'output_finalValidGroups';
 select * from output_finalValidGroups;
+select 'output_reminderMsgs';
 select * from output_reminderMsgs;
+
