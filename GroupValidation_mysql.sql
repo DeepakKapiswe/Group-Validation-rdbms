@@ -1,14 +1,9 @@
-
 /*
 
 foreign/primary key errors to be handled after changing to mysql
 
 reminders be generated on trigger
-
---PRAGMA foreign_keys=1;
---PRAGMA recursive_triggers = ON;
-
-begin transaction;
+time consideration
 */
 
 DROP DATABASE IF EXISTS groupdb;
