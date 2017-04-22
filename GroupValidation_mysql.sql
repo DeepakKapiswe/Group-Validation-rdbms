@@ -66,7 +66,7 @@ CREATE TABLE input_userApplications
     msgId INTEGER AUTO_INCREMENT,
     msg TEXT NOT NULL,
     senderEmail TEXT NOT NULL,
-    timestamp TEXT NOT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT PKC_input_userApplications PRIMARY KEY (msgId)
 );
 
@@ -219,6 +219,17 @@ CREATE TABLE output_lengthExceededGroups
     ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
+CREATE TABLE output_lateSubmissions
+(
+    senderRollNo VARCHAR (10)  NOT NULL,
+    senderEmailId VARCHAR (255) NOT NULL,
+    msg TEXT NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    CONSTRAINT PKC_output_lateSubmissions PRIMARY KEY (senderRollno,timestamp)
+    /*FOREIGN KEY (senderEmailId) REFERENCES aux_senderEmails (senderEmailId)
+    ON DELETE RESTRICT ON UPDATE CASCADE*/
+);
+
 CREATE TABLE output_reminderMsgs
 (
     groupId INTEGER NOT NULL,
@@ -231,12 +242,6 @@ CREATE TABLE output_reminderMsgs
 );
 
 delimiter |
-
-CREATE TRIGGER trigger_insertCurrentTime before insert on input_userApplications
-FOR EACH ROW
-  begin
-    set new.timestamp =current_timestamp();
-  end;
 
 CREATE TRIGGER trigger_getApplicationInfo after insert on input_userApplications
 FOR EACH ROW
@@ -251,6 +256,8 @@ FOR EACH ROW
     insert into aux_senderEmails values(new.senderEmail);
     call procedure_getMaybeRollNos((select substr(new.msg,(select instr(new.msg,' ')+1))));
     insert into aux_userApplicationInfo (senderRollNo,senderEmailId,timestamp,validationResult) values ((select substr(new.msg,1,(select instr(new.msg,' ')-1))),new.senderEmail,new.timestamp,'valid');
+  else
+    insert into output_lateSubmissions values ((select substr(new.msg,1,(select instr(new.msg,' ')-1))),new.senderEmail,new.msg,new.timestamp);
     end if;
   end;
 
@@ -351,6 +358,7 @@ delimiter ;
 /*
 insert into input_userFormSubmissionDeadline(deadline) values ('2017-04-29 03:42:14');
 
+insert into input_userApplications(msg,senderEmail,timestamp) values('100 110 120 ','lkj@gmail.com','2017-05-29 03:42:14');
 insert into input_userApplications(msg,senderEmail,timestamp) values('13 49 19 ','yhty@gmail.com','2017-05-29 03:42:14');
 insert into input_userApplications(msg,senderEmail,timestamp) values('19 49 13 ','sknn@gmail.com',current_timestamp());
 insert into input_userApplications (msg,senderEmail,timestamp) values('49 13 19 ','etgt@gmail.com',current_timestamp());
@@ -390,4 +398,6 @@ select 'output_finalValidGroups';
 select * from output_finalValidGroups;
 select 'output_reminderMsgs';
 select * from output_reminderMsgs;
+select 'output_lateSubmissions';
+select * from output_lateSubmissions;
 */
